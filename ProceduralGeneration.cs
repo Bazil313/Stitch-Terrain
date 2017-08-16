@@ -29,8 +29,6 @@ public class ProceduralGeneration
 			GameManager.lSets.totalToFill += hm.Length * hm.Length;
 		}
 
-
-
 		CustomThreadPool.Instance.QueueUserTask (() => 
 			{
 				GenerationMethods thisGen = new GenerationMethods();
@@ -349,7 +347,7 @@ public class ProceduralGeneration
 				{
 					for (int z = 0; z < vm1[x].Length; z++) 
 					{
-						Vector3 zoneIndex = GameManager.gamemapToGamemap(new Vector3(x,0,z),6,2);
+						Vector3 zoneIndex = GameManager.gamemapToGamemap(new Vector3(x, 0, z),6,2);
 						int zoneNum = zm[(int)zoneIndex.x][(int)zoneIndex.z];
 
 						seedMap[x][z] = CommonGameObjects.assignVeggieProps(rand.Next(0,5),zoneNum, GameManager.gamemapToWorld(new Vector3(x,0,z),6));

@@ -16,8 +16,11 @@ public class GameManager : MonoBehaviour
 	public static MainTerrainSettings tSets = new MainTerrainSettings();
 	public static LoadingBarSettings lSets = new LoadingBarSettings();
 	public static MainPlayerSettings pSets = new MainPlayerSettings();
+	public static SoundSettings sSets = new SoundSettings();
 	public static bool menuState = false;
 	public static bool gameState = false;
+	public static bool gameMenuState = false;
+	public static bool musicState = false;
 
 	#endregion
 
@@ -41,14 +44,15 @@ public class GameManager : MonoBehaviour
 		initializeTerrainSettings (tSets);
 		initializeLoadingBar (lSets);
 		initializePlayer (pSets);
+		initializeSoundSettings (sSets);
 		GUIObjects.addEventSystem ();
-
 		startUpScreen ();
 	}
 
 	// Update is called once per frame
 	void Update () 
 	{
+		
 	}
 
 	// If the user exits the program, terminate all threads in the thread pool
@@ -65,19 +69,45 @@ public class GameManager : MonoBehaviour
 	#region Menu Functions
 
 	// Create the main menu
-	void startUpScreen()
+	public void startUpScreen()
 	{
-		GameObject canvas = CommonGameObjects.getCanvas();
+		if (gameState) 
+		{
+			CommonGameObjects.removeAllTaggedObjects (new string[] {"Player", "MainCamera", "Camera", "Canvas", "Button", "Image", "Light", "Terrain","Veggie","Text"});
+			lock (tSets)
+			{
+				tSets.veggiePool.Clear ();
+			}
+			GUIObjects.SetCursorLock (false);
+			gameState = false;
+		}
+
+		if (!musicState) 
+		{
+			GameObject mixer;
+			lock (sSets)
+			{
+				mixer = sSets.audioMixer;
+			}
+
+			AudioSource aS = CommonGameObjects.newAudioSource ("Music", mixer, 0, true, 0.5f, false);
+			aS.Play();
+
+			musicState = true;
+		}
+
+		GameObject canvas = CommonGameObjects.getNewCanvas();
+		menuState = true;
 
 		// Add the background image
-		GUIObjects.addBackgroundImage (canvas, "Main Menu Background", Vector2.zero, new Vector2 (1440, 900), 0);
+		GUIObjects.addBackgroundImage (canvas, "Main Menu Background", Vector2.zero, new Vector2 (1440, 900), 1);
 
 		// Create the menu buttons
-		Button buttonP = GUIObjects.addButton (canvas, "Play Button", new Vector2 ( 0, 120), new Vector2 (40, 15), 0);
-		Button buttonN = GUIObjects.addButton (canvas, "New Map", new Vector2 ( 0, 00), new Vector2 (40, 15), 1);
-		Button buttonQ = GUIObjects.addButton (canvas, "Exit", new Vector2 ( 0, -120), new Vector2 (40, 15), 2);
-		Button buttonS = GUIObjects.addButton (canvas, "Save Map", new Vector2 ( -180, 0), new Vector2 (12, 9), 3);
-		Button buttonL = GUIObjects.addButton (canvas, "Load Map", new Vector2 ( 180, 0), new Vector2 (12, 9), 4);
+		Button buttonP = GUIObjects.addButton (canvas, "Play Button", new Vector2 ( 0, 230), new Vector2 (500, 200), 0);
+		Button buttonN = GUIObjects.addButton (canvas, "New Map", new Vector2 ( 0, 0), new Vector2 (500, 200), 1);
+		Button buttonQ = GUIObjects.addButton (canvas, "Exit", new Vector2 ( 0, -230), new Vector2 (500, 200), 2);
+		Button buttonS = GUIObjects.addButton (canvas, "Save Map", new Vector2 ( -400, 0), new Vector2 (200, 150), 3);
+		Button buttonL = GUIObjects.addButton (canvas, "Load Map", new Vector2 ( 400, 0), new Vector2 (200, 150), 4);
 
 		// If all the maps are set, enable the play button to start the game when clicked
 		// Otherwise, output instructions to create maps first when clicked
@@ -286,6 +316,11 @@ public class GameManager : MonoBehaviour
 		lock (tSets) 
 		{
 			tSets.isSaved = false;
+			tSets.isHeightSet = false;
+			tSets.isZoneSet = false;
+			tSets.isAlphaSet = false;
+			tSets.isWaterSet = false;
+			tSets.isVeggieSet = false;
 		}
 
 		// Maps will be created in two chunks: 
@@ -387,9 +422,8 @@ public class GameManager : MonoBehaviour
 				zTiles = tSets.tileMap.GetLength (1);
 			}
 
-			// Temporarily hard-coded until final revisions of the vegetation algorithm
-			int numVeggieTypes = 15;
 			int numVeggies = 200;
+			int numVeggieTypes = 15;
 
 			resetLoadingBar (xTiles * zTiles + numVeggies * numVeggieTypes, 0);
 
@@ -404,7 +438,7 @@ public class GameManager : MonoBehaviour
 					{
 						int tileID = i * xTiles + j;
 						TerrainData tDat = CommonGameObjects.createTerrainData ("Tile ID -" + tileID, tSets.heightMapResolution, new Vector3 (tSets.tileSizeX, tSets.tileSizeY, tSets.tileSizeZ), tSets.alphaMapResolution, tSets.detailMapResolution);
-						GameObject thisTile = CommonGameObjects.createTerrain ("Tile ID -" + tileID +": Empty Terrain", tSets.outOfBoundsPos, tDat,tSets.tileParent.transform).gameObject;
+						GameObject thisTile = CommonGameObjects.createTerrain ("Tile ID -" + tileID + ": Empty Terrain", tSets.outOfBoundsPos, tDat,tSets.tileParent.transform).gameObject;
 						tSets.tileMap [i, j] = CommonGameObjects.createTerrainTile(thisTile, tileID);
 					}
 				}
@@ -425,7 +459,7 @@ public class GameManager : MonoBehaviour
 					{
 						VeggieObject tr = new VeggieObject();
 						tr.plantID = i;
-						tr.vr = CommonGameObjects.createVeggie ("Empty Veggie", tSets.outOfBoundsPos, Quaternion.identity, i,tSets.veggieParent.transform);
+						tr.vr = CommonGameObjects.createVeggie ("Empty Veggie", tSets.outOfBoundsPos, Quaternion.identity, i, tSets.veggieParent.transform);
 						tr.used = false;
 						tr.vr.SetActive (false);
 						tr.tileNum = -1;
@@ -456,16 +490,18 @@ public class GameManager : MonoBehaviour
 			closeLoadingBar ();
 
 			// Remove the menu items and create a player/camera/light for the game
-			CommonGameObjects.removeAllTaggedObjects (new string[]{ "MainCamera", "Camera", "Canvas", "Button", "Image", "Light" });
+			CommonGameObjects.removeAllTaggedObjects (new string[]{"Player", "MainCamera", "Camera", "Canvas", "Button", "Image", "Light","Text"});
 			lock (pSets) 
 			{
 				pSets.mainPlayer = CommonGameObjects.createPlayer (pSets.name, pSets.startPosition, pSets.rotation, 0,0);
 				pSets.isPlayerSet = true;
 				pSets.theSun = CommonGameObjects.createLight ("THE SUN", pSets.sunStartPosition, pSets.sunRotation, pSets.sunType, pSets.sunShadows, pSets.sunColor);
 			}
-
 			// Initialize the player/light/camera settings
 			updatePlayerVisuals ();
+
+			openGameCanvas ();
+			StartCoroutine (checkMenuInput());
 		} 
 		else
 		{
@@ -475,6 +511,36 @@ public class GameManager : MonoBehaviour
 		yield return new WaitForSeconds (0.01f);
 	}
 		
+	// Create the in-game menu
+	public void openGameMenuScreen()
+	{
+		lock (pSets) 
+		{
+			GameObject canvasGO = pSets.canvasGO;
+
+			if (canvasGO != null) 
+			{
+				// Add the background image
+				GUIObjects.addBackgroundImage (canvasGO, "Menu Background", Vector2.zero, new Vector2 (1440, 900), 3);
+				GUIObjects.addText (canvasGO, "Return to Main Instructions", new Vector2 (0, 0), new Vector2 (1000, 300), "Press Escape to Return to Main Menu\n\nPress Enter to Return to Game", 0,50, Color.white, TextAnchor.MiddleCenter);
+			} 
+			else 
+			{
+				Debug.Log("No Canvas found to open Menu Background");
+			}
+		}
+	}
+
+	// Create the in-game GUI
+	public void openGameCanvas()
+	{
+		lock (pSets)
+		{
+			pSets.canvasGO = CommonGameObjects.getNewCanvas ();
+			GUIObjects.addText (pSets.canvasGO, "Menu Instructions", new Vector2 (900, 550), new Vector2 (500, 100), "Press Enter for Menu", 0,  20, Color.black, TextAnchor.UpperLeft);
+		}
+	}
+
 	#endregion
 
 	#region Loading Bar
@@ -483,12 +549,13 @@ public class GameManager : MonoBehaviour
 	// Current implementation will remove the player camera if called during gamestate, needs to be revised
 	void loadingBarScreen()
 	{
-		GameObject canvas = CommonGameObjects.getCanvas ();
-		GUIObjects.addBackgroundImage(canvas, "Loading Bar Background", Vector2.zero, new Vector2 (1440, 900), 1);
+		GameObject canvas = CommonGameObjects.getNewCanvas ();
+		menuState = true;
+		GUIObjects.addBackgroundImage(canvas, "Loading Bar Background", Vector2.zero, new Vector2 (1440, 900), 2);
 		lock (lSets) 
 		{
-			lSets.image = GUIObjects.addImage (canvas, "Loader Border", Vector2.zero, new Vector2 (77, 12), 0);
-			lSets.image = GUIObjects.addLoadingBar (canvas, "Menu to Game Loader", Vector2.zero, new Vector2 (80, 30), 0);
+			lSets.image = GUIObjects.addImage (canvas, "Loader Border", Vector2.zero, new Vector2 (1060, 165), 0);
+			lSets.image = GUIObjects.addLoadingBar (canvas, "Menu to Game Loader", Vector2.zero, new Vector2 (1100, 385), 0);
 			lSets.isSet = true;
 			lSets.isActive = true;
 		}
@@ -553,6 +620,69 @@ public class GameManager : MonoBehaviour
 	#endregion
 
 	#region Updates
+
+	// Looks for keystrokes that interact with menu option in the game
+	// Needs to be revised for event system instead of constant looping
+	IEnumerator checkMenuInput()
+	{
+		bool entReset = true;
+		bool escReset = true;
+		// Loop continuously during gamestate
+		while (gameState) 
+		{
+			// If enter is pressed
+			if (Input.GetKey (KeyCode.Return)) 
+			{
+				// If this is the first iteration where the button has been down toggle the game menu
+				if (entReset) 
+				{
+					// If already in the menu switch back to the game screen, otherwise open the menu
+					if (gameMenuState) 
+					{
+						openGameCanvas ();
+						gameMenuState = false;
+					} 
+					else
+					{
+						openGameMenuScreen ();
+						gameMenuState = true;
+					}
+				}
+				// Set a flag that the enter key has not been released yet
+				entReset = false;
+			} 
+			else 
+			{
+				// Change the flag to indicate the enter key was released
+				if (!entReset)
+					entReset = true;
+			}
+
+			// If the game menu is up and escape is pressed exit to the main menu
+			if (gameMenuState) 
+			{
+				if (Input.GetKey(KeyCode.Escape))
+				{
+					// If this is the first iteration where the button has been down exit to the main menu
+					if (escReset)
+					{
+						gameMenuState = false;
+						startUpScreen ();
+					}
+					// Set a flag that the escape key has not been released yet
+					escReset = false;
+				}
+				else 
+				{
+					// Change the flag to indicate the escape key was released
+					if (!escReset)
+						escReset = true;
+				}
+			}
+
+			yield return new WaitForSeconds (0.1f);
+		}
+	}
 
 	// Coroutine that runs continuously during gamestate, checking to see if the tiles or objects need updates
 	// Checks player location every loop, and if player has moved significantly it cycles through the tiles to find ones that need updates
@@ -632,14 +762,14 @@ public class GameManager : MonoBehaviour
 				{
 					for(int j = 0; j < zTiles; j++)
 					{
-						// Check this tile to see if it needs updating
 						bool updated;
 						lock (tSets) 
 						{
 							updated = tSets.tileMap [i, j].needsUpdate;
 						}
 
-						if (updated)
+						// Check this tile to see if it needs updating and check to make sure the player has not switched back to a menu duirng a yield
+						if (updated && gameState)
 						{
 							//Store the tile
 							TerrainTile tTile;
@@ -710,14 +840,14 @@ public class GameManager : MonoBehaviour
 				{
 					for (int j = 0; j < zTiles; j++) 
 					{
-						// Check this tile to see if it needs updating
 						bool updated;
 						lock (tSets) 
 						{
 							updated = tSets.tileMap [i, j].needsUpdate;
 						}
 
-						if (updated)
+						// Check this tile to see if it needs updating and check to make sure the player has not switched back to a menu duirng a yield
+						if (updated && gameState)
 						{
 							// Store this terrain tile
 							TerrainTile tTile;
@@ -1353,10 +1483,8 @@ public class GameManager : MonoBehaviour
 			t.numZones = CommonGameObjects.terrainTextureColor.GetLength (0);
 			t.veggiePool = new List<VeggieObject> ();
 			t.veggieParent = new GameObject ();
-			t.veggieParent.tag = "Veggie";
 			t.veggieParent.name = "Veggies";
 			t.tileParent = new GameObject ();
-			t.tileParent.tag = "Terrain";
 			t.tileParent.name = "Terrain Tiles";
 			t.alphaMapResolution = 128;
 			t.detailMapResolution = 256;
@@ -1410,11 +1538,12 @@ public class GameManager : MonoBehaviour
 		p.skyColor = sky + new Color (0/255f, 0/255f,0/255f, 50/255f);
 		p.fogEnabled = true;
 		p.fogColor = sky;
-		p.fogDensity = 0.07f;
+		p.fogDensity = 0.1f;
 		p.needsUpdate = true;
 		p.isDefaultSet = true;
 		p.isPlayerSet = false;
 		p.mainPlayer = null;
+		p.canvasGO = null;
 		p.startPosition = new Vector3(5,50,5);
 		p.currentPosition = p.startPosition;
 		p.rotation = Quaternion.identity;
@@ -1423,6 +1552,12 @@ public class GameManager : MonoBehaviour
 		p.sunShadows = LightShadows.Soft;
 		p.sunType = LightType.Directional;
 		p.sunColor = new Color(255/255f, 248/255f, 188/255f, 255/255f);
+	}
+
+	void initializeSoundSettings(SoundSettings s)
+	{
+		s.audioMixer = new GameObject ();
+		s.audioMixer.name = "Audio Mixer";
 	}
 
 	#endregion
@@ -1513,7 +1648,13 @@ public class MainPlayerSettings
 	public LightShadows sunShadows;
 	public LightType sunType;
 	public Color sunColor;
+	public GameObject canvasGO;
 }
 
+public class SoundSettings
+{
+	public GameObject audioMixer;
+	public AudioListener currentListener;
+}
 
 #endregion

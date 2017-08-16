@@ -9,8 +9,10 @@ public class GUIObjects
 	public static GameObject EventSystemInstance;
 
 	private static string[] backgroundImages = {
+		"GUI/In_Game_Menu/Clear",
 		"GUI/Main_Load_Screen/Loading_Screen_Image",
-		"GUI/Main_Load_Screen/Loading_Bar_Active_Background"
+		"GUI/Main_Load_Screen/Loading_Bar_Active_Background",
+		"GUI/In_Game_Menu/bg_shadow"
 	};
 
 	private static string[] buttonImages = {
@@ -29,10 +31,28 @@ public class GUIObjects
 		"GUI/Main_Load_Screen/Loading_Border"
 	};
 
+	private static string[] fontTypes = {
+		"Arial.ttf"
+	};
+
 	//Constructor
 	public GUIObjects()
 	{
 
+	}
+
+	public static void SetCursorLock(bool value)
+	{
+		if (!value)
+		{
+			Cursor.lockState = CursorLockMode.None;
+			Cursor.visible = true;
+		} 
+		else
+		{
+			Cursor.lockState = CursorLockMode.Locked;
+			Cursor.visible = false;
+		}
 	}
 
 	public static void addEventSystem () 
@@ -49,7 +69,6 @@ public class GUIObjects
 		} 
 	}
 
-
 	public static GameObject createCanvas(Camera camera, string canvasName)
 	{
 		GameObject canvasGo = new GameObject ();
@@ -57,12 +76,8 @@ public class GUIObjects
 		canvasGo.tag = "Canvas";
 		canvasGo.AddComponent<RectTransform> ();
 		Canvas canvasCV = canvasGo.AddComponent<Canvas> ();
-		canvasCV.renderMode = RenderMode.ScreenSpaceCamera;
+		canvasCV.renderMode = RenderMode.ScreenSpaceOverlay;
 		canvasGo.AddComponent<GraphicRaycaster> ();
-		Vector3 pos = camera.gameObject.transform.position;
-		pos += camera.gameObject.transform.forward * 10.0f;
-
-
 		canvasCV.worldCamera = camera;
 
 		return canvasGo;
@@ -99,6 +114,29 @@ public class GUIObjects
 		buttonIM.overrideSprite = buttonSP;
 
 		return buttonBU;
+	}
+
+	public static Text addText(GameObject canvasGo, string name, Vector2 screenPos, Vector2 size, string text, int fontSelect, int fontSize, Color color, TextAnchor anc)
+	{
+		GameObject textGO = new GameObject ();
+		textGO.transform.position = canvasGo.transform.position;
+		textGO.name = name;
+		textGO.tag = "Text";
+		RectTransform textRT = textGO.AddComponent<RectTransform> ();
+		textRT.SetParent (canvasGo.GetComponent<RectTransform>());
+		textRT.sizeDelta = size;
+		textRT.anchoredPosition = screenPos;
+
+		Text textO = textGO.AddComponent<Text> ();
+		textO.text = text;
+		textO.fontSize = fontSize;
+		textO.color = color;
+		textO.alignment = anc;
+
+		Font aFont = (Font)Resources.GetBuiltinResource(typeof (Font), fontTypes[fontSelect]);
+		textO.font = aFont;
+
+		return textO;
 	}
 
 	public static Image addLoadingBar(GameObject canvasGo, string name, Vector2 screenPos, Vector2 size, int selector)
@@ -139,12 +177,5 @@ public class GUIObjects
 		canvasLD.fillMethod = Image.FillMethod.Horizontal;
 		canvasLD.fillAmount = 1;
 		return canvasLD;
-	}
-
-	public static void updateLoadingBar(Image canvasLD, float percent)
-	{
-		float start = canvasLD.fillAmount;
-		float end = Mathf.Clamp (start += percent, 0, 1);
-		canvasLD.fillAmount = end;
 	}
 }

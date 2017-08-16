@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 using UnityEngine.PostProcessing;
+using System.Collections.Generic;
 
 public class CommonGameObjects
 {
@@ -96,6 +97,11 @@ public class CommonGameObjects
 		//{ 1f/   1f,5, 1f/   1f,5,0.1f,0.1f,0.1f,  2,  2,0.1f,0,0.100f,0.30f,1f,1.2f}, //17
 	};
 
+	private static string[] musicAudioFiles = 
+	{
+		"Audio/Music/Back Oboe"
+	};
+
 	#endregion
 
 	private static System.Random rand = new System.Random ();
@@ -115,11 +121,16 @@ public class CommonGameObjects
 		Camera theCam = camera.AddComponent<Camera> ();
 		camera.AddComponent<FlareLayer> ();
 		camera.AddComponent<GUILayer> ();
-		camera.AddComponent<AudioListener> ();
+		AudioListener al = camera.AddComponent<AudioListener> ();
 		theCam.backgroundColor = col;
 		theCam.clearFlags = ccf;
 		camera.name = cameraName;
 		camera.tag = "Camera";
+
+		lock (GameManager.sSets)
+		{
+			GameManager.sSets.currentListener = al;
+		}
 
 		return theCam;
 	}
@@ -289,26 +300,49 @@ public class CommonGameObjects
 		return lights;
 	}
 
-	public static GameObject getCanvas()
+	public static GameObject getNewCanvas()
 	{
-		GameObject canvas;
+		GameObject canvasGO = GameObject.FindGameObjectWithTag ("Canvas");
 
-		// If the game is not already displaying a menu, remove all the current cameras and objects. Then create a new camera and canvas for the menu.
-		// Otherwise, clear all objects from the current menu canvas
-		if (!GameManager.menuState) 
-		{		
-			CommonGameObjects.removeAllTaggedObjects (new string[]{ "MainCamera", "Camera", "Canvas", "Button", "Image" });
-			Camera camera = CommonGameObjects.createCamera ("Menu Camera", new Vector3 (0, -500, 0), Quaternion.identity, CameraClearFlags.Color, Color.black);
-			canvas = GUIObjects.createCanvas (camera, "Main Menu Canvas");
-			GameManager.menuState = true;
-		} 
+		if (canvasGO == null)
+			canvasGO = GUIObjects.createCanvas (getCamera (), "Menu Canvas");
 		else 
-		{
-			canvas = GameObject.FindGameObjectWithTag ("Canvas");
-			CommonGameObjects.removeAllTaggedObjects (new string[]{ "Button", "Image"});
+		{	 
+			removeAllTaggedObjects (new string[]{ "Button", "Text", "Image"});
+			GUIObjects.addBackgroundImage (canvasGO, "Empty Image", Vector2.zero, new Vector2 (1440, 900), 0);
 		}
 
-		return canvas;
+		return canvasGO;
+	}
+
+	public static Camera getCamera()
+	{
+		GameObject cameraGO = GameObject.FindGameObjectWithTag ("MainCamera");
+		Camera camera;
+
+		if (cameraGO == null)
+			cameraGO = GameObject.FindGameObjectWithTag ("Camera");
+
+		if (cameraGO == null)
+			camera = createCamera ("Camera", new Vector3 (0, -500, 0), Quaternion.identity, CameraClearFlags.Color, Color.black);
+		else
+			camera = cameraGO.GetComponent<Camera> ();
+
+		return camera;
+	}
+
+	public static AudioSource newAudioSource(string name, GameObject go, int selector, bool looping, float vol, bool is3D)
+	{
+		AudioSource aS = go.AddComponent<AudioSource> ();
+		aS.name = name;
+		aS.tag = "Music Source";
+		aS.clip = Resources.Load<AudioClip> (musicAudioFiles [selector]);
+		aS.loop = looping;
+		aS.volume = vol;
+		if (!is3D)
+			aS.spatialBlend = 0;
+
+		return aS;
 	}
 
 	public static void removeAllTaggedObjects(string[] tags)
@@ -318,16 +352,16 @@ public class CommonGameObjects
 			GameObject[] obs = GameObject.FindGameObjectsWithTag (tag);
 			foreach (GameObject o in obs)
 			{
-				Transform[] chils = o.GetComponentsInChildren<Transform> ();
-				foreach (Transform t in chils) 
-				{
-					GameObject.Destroy (t.gameObject);
-				}
-				GameObject.Destroy (o);
+				//Transform[] chils = o.GetComponentsInChildren<Transform> ();
+				//foreach (Transform t in chils) 
+				//{
+				//	GameObject.DestroyImmediate (t.gameObject);
+				//}
+				GameObject.DestroyImmediate (o);
 			}
 		}
 	}
-
+		
 }
 
 public class TreeObject
